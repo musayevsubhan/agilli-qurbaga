@@ -663,6 +663,168 @@
         grid-template-columns: repeat(2, 1fr);
       }
     }
+
+
+    /* Kiçik telefon ekranları üçün əlavə optimallaşdırma */
+    @media (max-width: 600px) {
+      .app {
+        width: 100%;
+        padding: 0;
+      }
+
+      .hero,
+      .result-card {
+        border-radius: 0;
+        padding: 20px 16px;
+      }
+
+      .hero {
+        margin-top: 0;
+        grid-template-columns: 1fr;
+        gap: 18px;
+      }
+
+      .title {
+        font-size: clamp(32px, 10vw, 44px);
+        line-height: 1.08;
+      }
+
+      .subtitle {
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      .name-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      input {
+        min-width: 0;
+        width: 100%;
+      }
+
+      .name-row .btn-primary {
+        width: 100%;
+      }
+
+      .frog-wrap {
+        min-height: 220px;
+      }
+
+      .frog-art {
+        width: 170px;
+      }
+
+      .topbar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        padding: 0 8px;
+        font-size: 13px;
+      }
+
+      .stat {
+        padding: 8px 10px;
+        border-radius: 12px;
+      }
+
+      .game-action-bar {
+        padding: 0 8px;
+        margin: 8px 0;
+      }
+
+      .restart-top-btn {
+        font-size: 13px;
+        padding: 9px 12px;
+      }
+
+      .question-panel {
+        border-radius: 16px 16px 0 0;
+        padding: 16px 12px;
+      }
+
+      .question-meta {
+        gap: 6px;
+        font-size: 12px;
+      }
+
+      .pill {
+        padding: 5px 8px;
+      }
+
+      .question-text {
+        font-size: 22px;
+      }
+
+      pre {
+        font-size: 14px;
+        padding: 12px;
+      }
+
+      .water-stage {
+        min-height: 720px;
+        padding: 168px 12px 18px;
+        border-radius: 0 0 16px 16px;
+      }
+
+      .game-frog {
+        width: 145px;
+        top: 14px;
+      }
+
+      .boards {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+
+      .board {
+        min-height: 82px;
+        padding: 14px;
+        grid-template-columns: 40px 1fr;
+      }
+
+      .letter {
+        width: 38px;
+        height: 38px;
+        font-size: 18px;
+      }
+
+      .controls {
+        gap: 8px;
+      }
+
+      .controls button:not(.icon-btn) {
+        flex: 1 1 150px;
+      }
+
+      .icon-btn {
+        width: 48px;
+        height: 48px;
+      }
+
+      table {
+        font-size: 13px;
+      }
+
+      th,
+      td {
+        padding: 8px;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .topbar {
+        grid-template-columns: 1fr;
+      }
+
+      .question-text {
+        font-size: 20px;
+      }
+
+      .water-stage {
+        min-height: 760px;
+      }
+    }
   </style>
 </head>
 
