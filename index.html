@@ -1,0 +1,1475 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ağıllı Qurbağa - Python Bilik Oyunu</title>
+
+  <style>
+    :root {
+      --bg-1: #071c2f;
+      --bg-2: #123c69;
+      --water-1: #0b6fa4;
+      --water-2: #064d73;
+      --panel: rgba(255, 255, 255, 0.94);
+      --text: #123;
+      --primary: #12a150;
+      --danger: #d62828;
+      --warning: #f4a261;
+      --board: #b9793f;
+      --board-dark: #85552b;
+      --correct: #21c45d;
+      --wrong: #e63946;
+      --shadow: rgba(0, 0, 0, 0.25);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      /* Azərbaycan hərflərini dəstəkləyən sistem şriftləri */
+      font-family: "Segoe UI", "Noto Sans", Arial, Helvetica, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at top, #1b6fa9 0%, var(--bg-2) 35%, var(--bg-1) 100%);
+      overflow-x: hidden;
+    }
+
+    .app {
+      width: min(1120px, 96vw);
+      margin: 0 auto;
+      padding: 24px 0 36px;
+    }
+
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .hero,
+    .result-card {
+      background: var(--panel);
+      border-radius: 24px;
+      box-shadow: 0 18px 45px var(--shadow);
+      padding: 28px;
+    }
+
+    .hero {
+      margin-top: 40px;
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 28px;
+      align-items: center;
+    }
+
+    .title {
+      font-size: clamp(34px, 5vw, 58px);
+      margin: 0 0 12px;
+      color: #08324f;
+      line-height: 1.05;
+    }
+
+    .subtitle {
+      font-size: 18px;
+      line-height: 1.55;
+      margin: 0 0 24px;
+    }
+
+    .name-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    input,
+    button {
+      font: inherit;
+    }
+
+    input {
+      border: 2px solid #c7d7e3;
+      border-radius: 14px;
+      padding: 14px 16px;
+      outline: none;
+      min-width: 260px;
+      background: #fff;
+    }
+
+    input:focus {
+      border-color: var(--primary);
+    }
+
+    button {
+      border: 0;
+      border-radius: 14px;
+      padding: 14px 18px;
+      cursor: pointer;
+      font-weight: 700;
+      transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.15);
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+      box-shadow: none;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-secondary {
+      background: #08324f;
+      color: white;
+    }
+
+    .btn-warning {
+      background: var(--warning);
+      color: #261304;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: white;
+    }
+
+    .icon-btn {
+      width: 52px;
+      height: 52px;
+      padding: 0;
+      display: inline-grid;
+      place-items: center;
+      font-size: 22px;
+      border-radius: 16px;
+    }
+
+    .small-note {
+      color: #4d6575;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* Başlanğıc ekranındakı qurbağa sahəsi */
+    .frog-wrap {
+      min-height: 310px;
+      position: relative;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(160deg, #dff9ff, #b5ecff);
+      border-radius: 22px;
+      overflow: hidden;
+    }
+
+    /* SVG qurbağa */
+    .frog-art {
+      width: 220px;
+      max-width: 100%;
+    }
+
+    .frog-art svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .start-frog {
+      animation: idleJump 2.3s ease-in-out infinite;
+    }
+
+    @keyframes idleJump {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .frog-shadow {
+      fill: rgba(0, 0, 0, 0.12);
+    }
+
+    .frog-head {
+      fill: #62c85d;
+      stroke: rgba(0, 0, 0, 0.08);
+      stroke-width: 2;
+    }
+
+    .frog-belly {
+      fill: rgba(255, 255, 255, 0.16);
+    }
+
+    .frog-eye-fill {
+      fill: #7cdb73;
+    }
+
+    .frog-eye-white {
+      fill: #ffffff;
+    }
+
+    .frog-pupil {
+      fill: #111;
+    }
+
+    .frog-cheek {
+      fill: rgba(255, 148, 148, 0.55);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      transform-origin: center;
+    }
+
+    .frog-glasses {
+      fill: none;
+      stroke: #17202a;
+      stroke-width: 5;
+    }
+
+    .frog-glasses-bridge {
+      fill: #17202a;
+    }
+
+    .frog-mouth-neutral,
+    .frog-mouth-happy,
+    .frog-mouth-sad {
+      fill: none;
+      stroke: #1b5e20;
+      stroke-width: 6;
+      stroke-linecap: round;
+      transition: opacity 0.25s ease;
+    }
+
+    .frog-mouth-happy,
+    .frog-mouth-sad {
+      opacity: 0;
+    }
+
+    /* Oyun statistikası */
+    .topbar {
+      display: grid;
+      grid-template-columns: repeat(5, auto);
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      color: white;
+      margin-bottom: 14px;
+    }
+
+    .game-action-bar {
+      display: flex;
+      justify-content: flex-end;
+      margin: -4px 0 14px;
+    }
+
+    .restart-top-btn {
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 14px;
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
+    }
+
+    .stat {
+      background: rgba(255, 255, 255, 0.16);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      padding: 10px 14px;
+      border-radius: 16px;
+      backdrop-filter: blur(8px);
+      font-weight: 700;
+    }
+
+    .game-card {
+      padding: 0;
+      overflow: hidden;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .question-panel {
+      background: rgba(255, 255, 255, 0.94);
+      border-radius: 22px 22px 0 0;
+      padding: 22px;
+      box-shadow: 0 12px 30px var(--shadow);
+    }
+
+    .question-meta {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      color: #365469;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #e8f2f8;
+    }
+
+    .question-text {
+      font-size: clamp(20px, 2.4vw, 30px);
+      line-height: 1.35;
+      margin: 0;
+      color: #061d2e;
+    }
+
+    pre {
+      /* Kod hissələri üçün Azərbaycan hərflərini dəstəkləyən monospace şriftlər */
+      font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
+      white-space: pre-wrap;
+      background: #071c2f;
+      color: #eaf7ff;
+      border-radius: 14px;
+      padding: 14px;
+      overflow-x: auto;
+      font-size: 16px;
+      line-height: 1.45;
+      margin: 16px 0 0;
+    }
+
+    .timer-area {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      margin-top: 18px;
+    }
+
+    .timer-track {
+      height: 16px;
+      border-radius: 999px;
+      background: #d8e8f2;
+      overflow: hidden;
+    }
+
+    .timer-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #21c45d, #f4a261, #d62828);
+      transition: width 0.25s linear;
+    }
+
+    .timer-text {
+      min-width: 78px;
+      text-align: center;
+      font-weight: 800;
+      color: #08324f;
+      background: #fff;
+      border-radius: 12px;
+      padding: 8px 10px;
+    }
+
+    /* Su səhnəsi */
+    .water-stage {
+      position: relative;
+      min-height: 485px;
+      background: linear-gradient(180deg, var(--water-1), var(--water-2));
+      border-radius: 0 0 22px 22px;
+      overflow: hidden;
+      padding: 188px 22px 24px;
+      box-shadow: 0 18px 45px var(--shadow);
+    }
+
+    .water-stage::before,
+    .water-stage::after {
+      content: "";
+      position: absolute;
+      left: -10%;
+      width: 120%;
+      height: 72px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 50%;
+      animation: waves 7s linear infinite;
+      z-index: 1;
+    }
+
+    .water-stage::before { top: 42px; }
+    .water-stage::after { top: 130px; animation-duration: 10s; opacity: 0.7; }
+
+    @keyframes waves {
+      from { transform: translateX(0); }
+      to { transform: translateX(-80px); }
+    }
+
+    .game-frog {
+      position: absolute;
+      left: 50%;
+      top: 4px;
+      width: 172px;
+      transform: translateX(-50%);
+      transform-origin: center center;
+      z-index: 6;
+    }
+
+    .game-frog.happy {
+      animation: happyDance 0.8s ease;
+    }
+
+    .game-frog.happy .frog-mouth-neutral {
+      opacity: 0;
+    }
+
+    .game-frog.happy .frog-mouth-happy {
+      opacity: 1;
+    }
+
+    .game-frog.happy .frog-cheek {
+      opacity: 1;
+      transform: scale(1.15);
+    }
+
+    .game-frog.sad {
+      animation: sadShake 0.7s ease;
+    }
+
+    .game-frog.sad .frog-mouth-neutral {
+      opacity: 0;
+    }
+
+    .game-frog.sad .frog-mouth-sad {
+      opacity: 1;
+    }
+
+    .game-frog.sad .frog-cheek {
+      opacity: 0.28;
+    }
+
+    @keyframes happyDance {
+      0%   { transform: translateX(-50%) scale(1) rotate(0deg); }
+      25%  { transform: translateX(-50%) scale(1.04) rotate(-5deg); }
+      50%  { transform: translateX(-50%) scale(1.07) rotate(5deg); }
+      75%  { transform: translateX(-50%) scale(1.04) rotate(-4deg); }
+      100% { transform: translateX(-50%) scale(1) rotate(0deg); }
+    }
+
+    @keyframes sadShake {
+      0%   { transform: translateX(-50%) translateY(0) rotate(0deg); }
+      20%  { transform: translateX(-53%) translateY(2px) rotate(-4deg); }
+      40%  { transform: translateX(-47%) translateY(2px) rotate(4deg); }
+      60%  { transform: translateX(-53%) translateY(2px) rotate(-3deg); }
+      80%  { transform: translateX(-47%) translateY(2px) rotate(3deg); }
+      100% { transform: translateX(-50%) translateY(0) rotate(0deg); }
+    }
+
+    .boards {
+      position: relative;
+      z-index: 3;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(210px, 1fr));
+      gap: 22px;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    .board {
+      min-height: 96px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, var(--board), var(--board-dark));
+      color: white;
+      text-align: left;
+      box-shadow: 0 12px 0 #59381d, 0 18px 28px rgba(0, 0, 0, 0.28);
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: 12px;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+      animation: floatBoard 2.8s ease-in-out infinite;
+    }
+
+    .board:nth-child(2) { animation-delay: 0.3s; }
+    .board:nth-child(3) { animation-delay: 0.6s; }
+    .board:nth-child(4) { animation-delay: 0.9s; }
+
+    @keyframes floatBoard {
+      0%, 100% { transform: translateY(0) rotate(-0.3deg); }
+      50% { transform: translateY(-8px) rotate(0.3deg); }
+    }
+
+    .board::before,
+    .board::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.17);
+    }
+
+    .board::before { top: 28px; }
+    .board::after { bottom: 24px; }
+
+    .letter {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.92);
+      color: #5a371a;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      font-size: 20px;
+      z-index: 1;
+    }
+
+    .answer-text {
+      position: relative;
+      z-index: 1;
+      font-weight: 800;
+      line-height: 1.35;
+    }
+
+    .board.correct {
+      background: linear-gradient(180deg, #31cf6b, #159447);
+      box-shadow: 0 12px 0 #0c5a2a, 0 18px 28px rgba(0, 0, 0, 0.28);
+    }
+
+    .board.wrong {
+      background: linear-gradient(180deg, #ef5765, #b81d2b);
+      box-shadow: 0 12px 0 #77121c, 0 18px 28px rgba(0, 0, 0, 0.28);
+    }
+
+    .board.sink {
+      animation: sink 0.9s ease forwards;
+      pointer-events: none;
+    }
+
+    @keyframes sink {
+      0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(260px) rotate(13deg); opacity: 0; }
+    }
+
+    .controls {
+      margin: 22px auto 0;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      z-index: 4;
+    }
+
+    .feedback {
+      margin: 18px auto 0;
+      max-width: 860px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 18px;
+      padding: 16px 18px;
+      display: none;
+      position: relative;
+      z-index: 4;
+      line-height: 1.5;
+    }
+
+    .feedback.show {
+      display: block;
+    }
+
+    .feedback.good {
+      border-left: 8px solid var(--correct);
+    }
+
+    .feedback.bad {
+      border-left: 8px solid var(--wrong);
+    }
+
+    .result-card {
+      margin-top: 36px;
+    }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 12px;
+      margin: 20px 0;
+    }
+
+    .result-box {
+      background: #e8f2f8;
+      border-radius: 16px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .result-box strong {
+      display: block;
+      font-size: 28px;
+      color: #08324f;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      background: white;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    th,
+    td {
+      padding: 12px;
+      border-bottom: 1px solid #e5edf3;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #08324f;
+      color: white;
+    }
+
+    @media (max-width: 780px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .boards {
+        grid-template-columns: 1fr;
+      }
+
+      .water-stage {
+        min-height: 700px;
+        padding-top: 180px;
+      }
+
+      .game-frog {
+        width: 150px;
+        top: 12px;
+      }
+
+      .timer-area {
+        grid-template-columns: 1fr;
+      }
+
+      .timer-text {
+        width: 100%;
+      }
+
+      .result-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <section id="startScreen" class="screen active">
+      <div class="hero">
+        <div>
+          <h1 class="title">Ağıllı Qurbağa</h1>
+          <p class="subtitle">
+            Eynəkli qurbağaya Python bilik gölünü keçməyə kömək et. Suallara
+            cavab ver, xal topla, canlarını qoru və finala çat!
+          </p>
+
+          <div class="name-row">
+            <input id="playerName" type="text" placeholder="Adını daxil et" maxlength="24" />
+            <button id="startBtn" class="btn-primary">Oyuna başla</button>
+          </div>
+
+          <p class="small-note">
+            Cavabı mausla seçə və ya klaviaturadan A, B, C, D düymələrindən istifadə edə bilərsən.
+          </p>
+        </div>
+
+        <div class="frog-wrap" aria-label="Eynəkli qurbağa personajı">
+          <div class="frog-art start-frog">
+            <svg viewBox="0 0 220 180" aria-hidden="true">
+              <ellipse class="frog-shadow" cx="110" cy="158" rx="54" ry="12"></ellipse>
+              <ellipse class="frog-head" cx="110" cy="100" rx="68" ry="58"></ellipse>
+              <ellipse class="frog-belly" cx="110" cy="121" rx="43" ry="25"></ellipse>
+
+              <circle class="frog-eye-fill" cx="78" cy="55" r="25"></circle>
+              <circle class="frog-eye-fill" cx="142" cy="55" r="25"></circle>
+
+              <circle class="frog-eye-white" cx="78" cy="57" r="13"></circle>
+              <circle class="frog-eye-white" cx="142" cy="57" r="13"></circle>
+
+              <circle class="frog-pupil" cx="82" cy="56" r="5"></circle>
+              <circle class="frog-pupil" cx="138" cy="56" r="5"></circle>
+
+              <circle class="frog-cheek" cx="82" cy="118" r="9"></circle>
+              <circle class="frog-cheek" cx="138" cy="118" r="9"></circle>
+
+              <path class="frog-mouth-neutral" d="M84 119 Q110 139 136 119"></path>
+              <path class="frog-mouth-happy" d="M82 116 Q110 148 138 116"></path>
+              <path class="frog-mouth-sad" d="M86 138 Q110 114 134 138"></path>
+
+              <circle class="frog-glasses" cx="78" cy="57" r="18"></circle>
+              <circle class="frog-glasses" cx="142" cy="57" r="18"></circle>
+              <rect class="frog-glasses-bridge" x="96" y="54" width="28" height="6" rx="3"></rect>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="gameScreen" class="screen">
+      <div class="topbar">
+        <div class="stat">Oyunçu: <span id="nameStat">-</span></div>
+        <div class="stat">Xal: <span id="scoreStat">0</span></div>
+        <div class="stat">Can: <span id="livesStat">❤️❤️❤️</span></div>
+        <div class="stat">Sual: <span id="questionStat">1</span></div>
+        <div class="stat">Səviyyə: <span id="levelStat">1</span></div>
+      </div>
+
+      <div class="game-action-bar">
+        <button id="restartBtn" class="btn-danger restart-top-btn">Oyunu yenidən başlat</button>
+      </div>
+
+      <div class="game-card">
+        <div class="question-panel">
+          <div class="question-meta">
+            <span class="pill">Mövzu: Python</span>
+            <span class="pill" id="difficultyPill">Çətinlik</span>
+            <span class="pill">Düz cavab: +100 xal</span>
+            <span class="pill">Tez cavab bonusu: +30 / +20 / +10</span>
+          </div>
+
+          <h2 id="questionText" class="question-text"></h2>
+          <pre id="codeBlock" hidden></pre>
+
+          <div class="timer-area">
+            <div class="timer-track" aria-label="Vaxt göstəricisi">
+              <div id="timerFill" class="timer-fill"></div>
+            </div>
+            <div id="timerText" class="timer-text">00:45</div>
+          </div>
+        </div>
+
+        <div class="water-stage">
+          <div id="gameFrog" class="frog-art game-frog">
+            <svg viewBox="0 0 220 180" aria-hidden="true">
+              <ellipse class="frog-shadow" cx="110" cy="158" rx="54" ry="12"></ellipse>
+              <ellipse class="frog-head" cx="110" cy="100" rx="68" ry="58"></ellipse>
+              <ellipse class="frog-belly" cx="110" cy="121" rx="43" ry="25"></ellipse>
+
+              <circle class="frog-eye-fill" cx="78" cy="55" r="25"></circle>
+              <circle class="frog-eye-fill" cx="142" cy="55" r="25"></circle>
+
+              <circle class="frog-eye-white" cx="78" cy="57" r="13"></circle>
+              <circle class="frog-eye-white" cx="142" cy="57" r="13"></circle>
+
+              <circle class="frog-pupil" cx="82" cy="56" r="5"></circle>
+              <circle class="frog-pupil" cx="138" cy="56" r="5"></circle>
+
+              <circle class="frog-cheek" cx="82" cy="118" r="9"></circle>
+              <circle class="frog-cheek" cx="138" cy="118" r="9"></circle>
+
+              <path class="frog-mouth-neutral" d="M84 119 Q110 139 136 119"></path>
+              <path class="frog-mouth-happy" d="M82 116 Q110 148 138 116"></path>
+              <path class="frog-mouth-sad" d="M86 138 Q110 114 134 138"></path>
+
+              <circle class="frog-glasses" cx="78" cy="57" r="18"></circle>
+              <circle class="frog-glasses" cx="142" cy="57" r="18"></circle>
+              <rect class="frog-glasses-bridge" x="96" y="54" width="28" height="6" rx="3"></rect>
+            </svg>
+          </div>
+
+          <div id="boards" class="boards"></div>
+          <div id="feedback" class="feedback"></div>
+
+          <div class="controls">
+            <button id="finishTimeBtn" class="btn-warning">Cavabı göstər</button>
+            <button id="nextBtn" class="btn-secondary" disabled>Növbəti sual</button>
+            <button id="musicToggleBtn" class="btn-secondary icon-btn" title="Musiqini aç/söndür" aria-label="Musiqini aç və ya söndür">🔊</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="resultScreen" class="screen">
+      <div class="result-card">
+        <h1 class="title">Nəticə</h1>
+        <p id="resultMessage" class="subtitle"></p>
+
+        <div class="result-grid">
+          <div class="result-box">Xal <strong id="finalScore">0</strong></div>
+          <div class="result-box">Düzgün <strong id="finalCorrect">0</strong></div>
+          <div class="result-box">Səhv <strong id="finalWrong">0</strong></div>
+          <div class="result-box">Qalan can <strong id="finalLives">0</strong></div>
+        </div>
+
+        <h2>Təkrar baxılmalı suallar</h2>
+        <div id="reviewArea"></div>
+
+        <div class="controls">
+          <button id="playAgainBtn" class="btn-primary">Yenidən oyna</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!--
+    Arxa plan musiqisi üçün faylı bu yola yerləşdirin:
+    /oyunlar/assets/bg-music.mp3
+  -->
+  <audio id="bgMusic" loop preload="auto">
+    <source src="assets/bg-music.mp3" type="audio/mpeg" />
+  </audio>
+
+  <!--
+    Böyük sual bazası ayrıca questions.js faylında saxlanacaq.
+    questions.js faylı bu HTML faylı ilə eyni qovluqda olmalıdır.
+    Faylın içində belə yazılmalıdır:
+
+    window.questionBank = [ ... ];
+  -->
+  <script src="questions.js"></script>
+
+  <script>
+    const MAX_LEVEL = 40;
+    const CORRECT_PER_LEVEL = 10;
+
+    /*
+      Əgər questions.js hələ hazır deyilsə, oyun test üçün aşağıdakı kiçik nümunə bazadan istifadə edəcək.
+      Əsas iş zamanı suallar questions.js faylında saxlanmalıdır.
+    */
+    const demoQuestionBank = [
+      {
+        id: 1,
+        difficulty: "easy",
+        time: 30,
+        question: "Aşağıdakı kodun nəticəsi nə olacaq?",
+        code: `a = 7
+b = 3
+print(a + b)`,
+        options: {
+          A: "10",
+          B: "73",
+          C: "4",
+          D: "Xəta"
+        },
+        correct: "A",
+        explanation: "a və b tam ədədlərdir. 7 + 3 = 10 olduğu üçün ekrana 10 çap edilir."
+      },
+      {
+        id: 2,
+        difficulty: "easy",
+        time: 30,
+        question: "Python-da siyahının ilk elementi hansı indekslə götürülür?",
+        code: `a = [12, 25, 40]
+print(a[?])`,
+        options: {
+          A: "1",
+          B: "0",
+          C: "-1",
+          D: "2"
+        },
+        correct: "B",
+        explanation: "Python-da indeksləmə 0-dan başlayır. Ona görə siyahının ilk elementi a[0] ilə götürülür."
+      },
+      {
+        id: 3,
+        difficulty: "medium",
+        time: 45,
+        question: "Aşağıdakı kodun nəticəsi nə olacaq?",
+        code: `s = 0
+for i in range(1, 5):
+    s = s + i
+print(s)`,
+        options: {
+          A: "10",
+          B: "15",
+          C: "5",
+          D: "4"
+        },
+        correct: "A",
+        explanation: "range(1, 5) ardıcıllığı 1, 2, 3, 4 qiymətlərini verir. Cəm 10 olur."
+      },
+      {
+        id: 4,
+        difficulty: "medium",
+        time: 45,
+        question: "Kodun nəticəsini müəyyən edin.",
+        code: `a = [2, 4, 6, 8]
+print(a[1] + a[3])`,
+        options: {
+          A: "10",
+          B: "12",
+          C: "6",
+          D: "14"
+        },
+        correct: "B",
+        explanation: "a[1] = 4, a[3] = 8. 4 + 8 = 12."
+      },
+      {
+        id: 5,
+        difficulty: "hard",
+        time: 60,
+        question: "Kod icra olunanda ekrana nə çıxacaq?",
+        code: `x = 5
+y = 2
+if x > 3 and y > 3:
+    print(x + y)
+else:
+    print(x - y)`,
+        options: {
+          A: "7",
+          B: "3",
+          C: "5",
+          D: "2"
+        },
+        correct: "B",
+        explanation: "x > 3 doğrudur, amma y > 3 yanlışdır. and üçün hər iki şərt doğru olmalıdır. Ona görə else işləyir: 5 - 2 = 3."
+      },
+      {
+        id: 6,
+        difficulty: "hard",
+        time: 60,
+        question: "Aşağıdakı kodun nəticəsi nədir?",
+        code: `n = 0
+for x in [3, 5, 8, 10]:
+    if x % 2 == 0:
+        n = n + x
+print(n)`,
+        options: {
+          A: "8",
+          B: "10",
+          C: "18",
+          D: "26"
+        },
+        correct: "C",
+        explanation: "Siyahıdakı cüt ədədlər 8 və 10-dur. Onların cəmi 18-dir."
+      }
+    ];
+
+    const questionBank = Array.isArray(window.questionBank) && window.questionBank.length > 0
+      ? window.questionBank
+      : demoQuestionBank;
+
+    const startScreen = document.getElementById("startScreen");
+    const gameScreen = document.getElementById("gameScreen");
+    const resultScreen = document.getElementById("resultScreen");
+
+    const playerNameInput = document.getElementById("playerName");
+    const startBtn = document.getElementById("startBtn");
+    const restartBtn = document.getElementById("restartBtn");
+    const playAgainBtn = document.getElementById("playAgainBtn");
+
+    const nameStat = document.getElementById("nameStat");
+    const scoreStat = document.getElementById("scoreStat");
+    const livesStat = document.getElementById("livesStat");
+    const questionStat = document.getElementById("questionStat");
+    const levelStat = document.getElementById("levelStat");
+
+    const difficultyPill = document.getElementById("difficultyPill");
+    const questionText = document.getElementById("questionText");
+    const codeBlock = document.getElementById("codeBlock");
+    const timerFill = document.getElementById("timerFill");
+    const timerText = document.getElementById("timerText");
+    const boards = document.getElementById("boards");
+    const feedback = document.getElementById("feedback");
+    const finishTimeBtn = document.getElementById("finishTimeBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const gameFrog = document.getElementById("gameFrog");
+
+    const finalScore = document.getElementById("finalScore");
+    const finalCorrect = document.getElementById("finalCorrect");
+    const finalWrong = document.getElementById("finalWrong");
+    const finalLives = document.getElementById("finalLives");
+    const resultMessage = document.getElementById("resultMessage");
+    const reviewArea = document.getElementById("reviewArea");
+
+    const bgMusic = document.getElementById("bgMusic");
+    const musicToggleBtn = document.getElementById("musicToggleBtn");
+
+    let playerName = "Oyunçu";
+    let currentQuestion = null;
+    let score = 0;
+    let lives = 3;
+    let maxLives = 5;
+    let correctCount = 0;
+    let wrongCount = 0;
+    let totalShownQuestions = 0;
+    let timer = null;
+    let timeLeft = 0;
+    let totalTime = 0;
+    let questionStartedAt = 0;
+    let answered = false;
+    let reviewList = [];
+    let nextLifeScore = 1000;
+    let audioCtx = null;
+    let musicEnabled = true;
+    let usedQuestionIds = [];
+
+    function showScreen(screen) {
+      [startScreen, gameScreen, resultScreen].forEach(item => item.classList.remove("active"));
+      screen.classList.add("active");
+    }
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+
+      return audioCtx;
+    }
+
+    function playTone(freq, duration = 0.15, type = "sine", volume = 0.04, delay = 0) {
+      const ctx = getAudioContext();
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+
+      gainNode.gain.setValueAtTime(0.0001, ctx.currentTime + delay);
+      gainNode.gain.exponentialRampToValueAtTime(volume, ctx.currentTime + delay + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + duration);
+
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      oscillator.start(ctx.currentTime + delay);
+      oscillator.stop(ctx.currentTime + delay + duration);
+    }
+
+    function playCorrectSound() {
+      playTone(523.25, 0.12, "triangle", 0.05, 0);
+      playTone(659.25, 0.12, "triangle", 0.05, 0.10);
+      playTone(783.99, 0.18, "triangle", 0.05, 0.20);
+    }
+
+    function playWrongSound() {
+      playTone(420, 0.12, "sawtooth", 0.04, 0);
+      playTone(320, 0.16, "sawtooth", 0.04, 0.12);
+    }
+
+    function playTimeUpSound() {
+      playTone(300, 0.15, "square", 0.035, 0);
+      playTone(260, 0.15, "square", 0.035, 0.14);
+      playTone(220, 0.20, "square", 0.035, 0.28);
+    }
+
+    function startBackgroundMusic() {
+      if (!bgMusic || !musicEnabled) return;
+
+      bgMusic.volume = 0.18;
+      bgMusic.play().catch(() => {
+        // Fayl yoxdursa və ya brauzer bloklayırsa, oyun yenə işləyəcək.
+      });
+    }
+
+    function stopBackgroundMusic() {
+      if (!bgMusic) return;
+      bgMusic.pause();
+      bgMusic.currentTime = 0;
+    }
+
+    function toggleMusic() {
+      if (!bgMusic) return;
+
+      musicEnabled = !musicEnabled;
+
+      if (musicEnabled) {
+        bgMusic.volume = 0.18;
+        bgMusic.play().catch(() => {});
+        musicToggleBtn.textContent = "🔊";
+      } else {
+        bgMusic.pause();
+        musicToggleBtn.textContent = "🔇";
+      }
+    }
+
+    function resetFrogMood() {
+      gameFrog.classList.remove("happy", "sad");
+    }
+
+    function showFrogReaction(type) {
+      resetFrogMood();
+      void gameFrog.offsetWidth;
+
+      if (type === "happy") {
+        gameFrog.classList.add("happy");
+        playCorrectSound();
+      } else if (type === "sad") {
+        gameFrog.classList.add("sad");
+        playWrongSound();
+      } else if (type === "timeout") {
+        gameFrog.classList.add("sad");
+        playTimeUpSound();
+      }
+    }
+
+    function getCurrentLevel() {
+      return Math.min(Math.floor(correctCount / CORRECT_PER_LEVEL) + 1, MAX_LEVEL);
+    }
+
+    function getDifficultyByLevel(level) {
+      if (level <= 10) return "easy";
+      if (level <= 30) return "medium";
+      return "hard";
+    }
+
+    function difficultyName(difficulty) {
+      const names = {
+        easy: "Asan",
+        medium: "Orta",
+        hard: "Çətin"
+      };
+
+      return names[difficulty] || difficulty;
+    }
+
+    function getRandomQuestion() {
+      const level = getCurrentLevel();
+      const difficulty = getDifficultyByLevel(level);
+
+      let availableQuestions = questionBank.filter(q => {
+        return q.difficulty === difficulty && !usedQuestionIds.includes(q.id);
+      });
+
+      // Əgər həmin çətinlikdə suallar bitibsə, eyni çətinlik üçün təkrar sual seçməyə icazə veririk.
+      // Böyük sual bazasında bu hal, adətən, baş verməyəcək.
+      if (availableQuestions.length === 0) {
+        availableQuestions = questionBank.filter(q => q.difficulty === difficulty);
+      }
+
+      if (availableQuestions.length === 0) {
+        return null;
+      }
+
+      const randomIndex = Math.floor(Math.random() * availableQuestions.length);
+      const selectedQuestion = availableQuestions[randomIndex];
+      usedQuestionIds.push(selectedQuestion.id);
+      return selectedQuestion;
+    }
+
+    function startGame() {
+      playerName = playerNameInput.value.trim() || "Oyunçu";
+
+      if (!Array.isArray(questionBank) || questionBank.length === 0) {
+        alert("Sual bazası tapılmadı. questions.js faylını yoxlayın.");
+        return;
+      }
+
+      score = 0;
+      lives = 3;
+      correctCount = 0;
+      wrongCount = 0;
+      totalShownQuestions = 0;
+      reviewList = [];
+      usedQuestionIds = [];
+      nextLifeScore = 1000;
+      nameStat.textContent = playerName;
+
+      showScreen(gameScreen);
+      startBackgroundMusic();
+      loadQuestion();
+    }
+
+    function loadQuestion() {
+      clearInterval(timer);
+      answered = false;
+      feedback.className = "feedback";
+      feedback.innerHTML = "";
+      nextBtn.disabled = true;
+      finishTimeBtn.disabled = false;
+      boards.innerHTML = "";
+      resetFrogMood();
+
+      if (lives <= 0 || getCurrentLevel() > MAX_LEVEL) {
+        endGame();
+        return;
+      }
+
+      currentQuestion = getRandomQuestion();
+
+      if (!currentQuestion) {
+        endGame();
+        return;
+      }
+
+      totalShownQuestions++;
+      totalTime = currentQuestion.time || getDefaultTimeByDifficulty(currentQuestion.difficulty);
+      timeLeft = totalTime;
+      questionStartedAt = Date.now();
+
+      questionText.textContent = currentQuestion.question;
+      difficultyPill.textContent = "Çətinlik: " + difficultyName(currentQuestion.difficulty);
+      questionStat.textContent = String(totalShownQuestions);
+      levelStat.textContent = String(getCurrentLevel());
+
+      if (currentQuestion.code && currentQuestion.code.trim()) {
+        codeBlock.hidden = false;
+        codeBlock.textContent = currentQuestion.code;
+      } else {
+        codeBlock.hidden = true;
+        codeBlock.textContent = "";
+      }
+
+      Object.entries(currentQuestion.options).forEach(([letter, text]) => {
+        const btn = document.createElement("button");
+        btn.className = "board";
+        btn.dataset.letter = letter;
+        btn.innerHTML = `<span class="letter">${letter}</span><span class="answer-text">${text}</span>`;
+        btn.addEventListener("click", () => chooseAnswer(letter));
+        boards.appendChild(btn);
+      });
+
+      updateStats();
+      updateTimerUi();
+      timer = setInterval(tick, 1000);
+    }
+
+    function getDefaultTimeByDifficulty(difficulty) {
+      if (difficulty === "easy") return 30;
+      if (difficulty === "medium") return 45;
+      return 60;
+    }
+
+    function tick() {
+      timeLeft--;
+      updateTimerUi();
+
+      if (timeLeft <= 0) {
+        revealAnswerDueToTime();
+      }
+    }
+
+    function updateTimerUi() {
+      const safeTime = Math.max(timeLeft, 0);
+      const minutes = String(Math.floor(safeTime / 60)).padStart(2, "0");
+      const seconds = String(safeTime % 60).padStart(2, "0");
+      timerText.textContent = `${minutes}:${seconds}`;
+      timerFill.style.width = `${(safeTime / totalTime) * 100}%`;
+    }
+
+    function chooseAnswer(letter) {
+      if (answered || !currentQuestion) return;
+
+      const isCorrect = letter === currentQuestion.correct;
+      const elapsedSeconds = Math.floor((Date.now() - questionStartedAt) / 1000);
+
+      answered = true;
+      clearInterval(timer);
+      disableBoards();
+
+      const selectedBoard = document.querySelector(`.board[data-letter="${letter}"]`);
+      const correctBoard = document.querySelector(`.board[data-letter="${currentQuestion.correct}"]`);
+
+      if (isCorrect) {
+        showFrogReaction("happy");
+
+        const bonus = calculateTimeBonus(elapsedSeconds);
+        score += 100 + bonus;
+        correctCount++;
+        selectedBoard.classList.add("correct");
+        showFeedback("good", `Düzgün cavab! +100 xal${bonus ? ` və +${bonus} tez cavab bonusu` : ""}. ${currentQuestion.explanation}`);
+        checkExtraLife();
+      } else {
+        showFrogReaction("sad");
+
+        lives--;
+        wrongCount++;
+        selectedBoard.classList.add("wrong", "sink");
+        correctBoard.classList.add("correct");
+        showFeedback("bad", `Səhv cavab. Düzgün cavab: ${currentQuestion.correct}) ${currentQuestion.options[currentQuestion.correct]}. ${currentQuestion.explanation}`);
+        addReview(currentQuestion, letter, "Səhv cavab");
+      }
+
+      finishTimeBtn.disabled = true;
+      nextBtn.disabled = false;
+      updateStats();
+      nextBtn.textContent = lives <= 0 ? "Nəticəni göstər" : "Növbəti sual";
+    }
+
+    function revealAnswerDueToTime() {
+      if (answered || !currentQuestion) return;
+
+      answered = true;
+      clearInterval(timer);
+      lives--;
+      wrongCount++;
+
+      disableBoards();
+      showFrogReaction("timeout");
+
+      document.querySelectorAll(".board").forEach(board => {
+        const letter = board.dataset.letter;
+        if (letter === currentQuestion.correct) {
+          board.classList.add("correct");
+        } else {
+          board.classList.add("wrong", "sink");
+        }
+      });
+
+      showFeedback("bad", `Düzgün cavab: ${currentQuestion.correct}) ${currentQuestion.options[currentQuestion.correct]}. ${currentQuestion.explanation}`);
+      addReview(currentQuestion, "Cavab verilmədi", "Cavab göstərildi və ya vaxt bitdi");
+      finishTimeBtn.disabled = true;
+      nextBtn.disabled = false;
+      nextBtn.textContent = lives <= 0 ? "Nəticəni göstər" : "Növbəti sual";
+      updateStats();
+    }
+
+    function finishTimeEarly() {
+      revealAnswerDueToTime();
+    }
+
+    function calculateTimeBonus(elapsedSeconds) {
+      if (elapsedSeconds <= 10) return 30;
+      if (elapsedSeconds <= 20) return 20;
+      if (elapsedSeconds <= 30) return 10;
+      return 0;
+    }
+
+    function checkExtraLife() {
+      while (score >= nextLifeScore) {
+        if (lives < maxLives) {
+          lives++;
+          showFeedback("good", feedback.innerHTML + `<br><strong>Bonus:</strong> 1000 xal həddini keçdin və əlavə 1 can qazandın!`);
+        }
+        nextLifeScore += 1000;
+      }
+    }
+
+    function disableBoards() {
+      document.querySelectorAll(".board").forEach(board => {
+        board.disabled = true;
+      });
+    }
+
+    function showFeedback(type, message) {
+      feedback.className = `feedback show ${type}`;
+      feedback.innerHTML = message;
+    }
+
+    function addReview(question, selectedAnswer, reason) {
+      reviewList.push({
+        question: question.question,
+        code: question.code,
+        selectedAnswer,
+        correct: question.correct,
+        correctText: question.options[question.correct],
+        explanation: question.explanation,
+        reason
+      });
+    }
+
+    function updateStats() {
+      scoreStat.textContent = score;
+      livesStat.textContent = "❤️".repeat(Math.max(lives, 0)) || "0";
+      levelStat.textContent = String(getCurrentLevel());
+    }
+
+    function goNext() {
+      loadQuestion();
+    }
+
+    function endGame() {
+      clearInterval(timer);
+      showScreen(resultScreen);
+
+      finalScore.textContent = score;
+      finalCorrect.textContent = correctCount;
+      finalWrong.textContent = wrongCount;
+      finalLives.textContent = Math.max(lives, 0);
+
+      const totalAnswered = correctCount + wrongCount;
+      const percent = totalAnswered ? Math.round((correctCount / totalAnswered) * 100) : 0;
+      let rank = "Başlanğıc səviyyə";
+
+      if (percent >= 90) rank = "Python çempionu";
+      else if (percent >= 75) rank = "Alqoritm ustası";
+      else if (percent >= 55) rank = "Çalışqan kodçu";
+
+      resultMessage.textContent = `${playerName}, nəticən: ${percent}% düzgün cavab. Çatdığın səviyyə: ${getCurrentLevel()}. Rütbə: ${rank}.`;
+      renderReview();
+    }
+
+    function renderReview() {
+      if (reviewList.length === 0) {
+        reviewArea.innerHTML = "<p>Bütün suallara düzgün cavab verdin. Təbriklər!</p>";
+        return;
+      }
+
+      const rows = reviewList.map((item, index) => {
+        const codeHtml = item.code ? `<pre>${escapeHtml(item.code)}</pre>` : "";
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td><strong>${escapeHtml(item.question)}</strong>${codeHtml}</td>
+            <td>${escapeHtml(String(item.selectedAnswer))}</td>
+            <td>${item.correct}) ${escapeHtml(item.correctText)}</td>
+            <td>${escapeHtml(item.explanation)}</td>
+          </tr>
+        `;
+      }).join("");
+
+      reviewArea.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Sual</th>
+              <th>Sənin cavabın</th>
+              <th>Düzgün cavab</th>
+              <th>İzah</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function restartToStart() {
+      clearInterval(timer);
+      stopBackgroundMusic();
+
+      musicEnabled = true;
+      if (musicToggleBtn) {
+        musicToggleBtn.textContent = "🔊";
+      }
+
+      showScreen(startScreen);
+    }
+
+    startBtn.addEventListener("click", startGame);
+    restartBtn.addEventListener("click", restartToStart);
+    playAgainBtn.addEventListener("click", restartToStart);
+    nextBtn.addEventListener("click", goNext);
+    finishTimeBtn.addEventListener("click", finishTimeEarly);
+    musicToggleBtn.addEventListener("click", toggleMusic);
+
+    playerNameInput.addEventListener("keydown", event => {
+      if (event.key === "Enter") startGame();
+    });
+
+    document.addEventListener("keydown", event => {
+      const key = event.key.toUpperCase();
+      if (["A", "B", "C", "D"].includes(key) && gameScreen.classList.contains("active")) {
+        chooseAnswer(key);
+      }
+    });
+  </script>
+</body>
+</html>
