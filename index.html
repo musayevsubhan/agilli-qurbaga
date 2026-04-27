@@ -88,11 +88,13 @@
     }
 
     input,
+    select,
     button {
       font: inherit;
     }
 
-    input {
+    input,
+    select {
       border: 2px solid #c7d7e3;
       border-radius: 14px;
       padding: 14px 16px;
@@ -101,8 +103,14 @@
       background: #fff;
     }
 
-    input:focus {
+    input:focus,
+    select:focus {
       border-color: var(--primary);
+    }
+
+    .difficulty-select {
+      min-width: 190px;
+      cursor: pointer;
     }
 
     button {
@@ -633,6 +641,13 @@
         grid-template-columns: 1fr;
       }
 
+      .name-row input,
+      .name-row select,
+      .name-row button {
+        width: 100%;
+        min-width: 0;
+      }
+
       .topbar {
         grid-template-columns: repeat(2, 1fr);
       }
@@ -922,11 +937,16 @@
 
           <div class="name-row">
             <input id="playerName" type="text" placeholder="Adını daxil et" maxlength="24" />
+            <select id="difficultySelect" class="difficulty-select" title="Oyunun çətinliyini seç">
+              <option value="easy">Asan oyun</option>
+              <option value="medium">Orta oyun</option>
+              <option value="hard">Çətin oyun</option>
+            </select>
             <button id="startBtn" class="btn-primary">Oyuna başla</button>
           </div>
 
           <p class="small-note">
-            Cavabı mausla seçə və ya klaviaturadan A, B, C, D düymələrindən istifadə edə bilərsən.
+            Çətinliyi seç, oyuna başla. Cavabı mausla seçə və ya klaviaturadan A, B, C, D düymələrindən istifadə edə bilərsən.
           </p>
         </div>
 
@@ -967,8 +987,8 @@
         <div class="stat">Oyunçu: <span id="nameStat">-</span></div>
         <div class="stat">Xal: <span id="scoreStat">0</span></div>
         <div class="stat">Can: <span id="livesStat">❤️❤️❤️</span></div>
-        <div class="stat">Sual: <span id="questionStat">1</span></div>
-        <div class="stat">Səviyyə: <span id="levelStat">1</span></div>
+        <div class="stat">Sual: <span id="questionStat">1/100</span></div>
+        <div class="stat">Səviyyə: <span id="levelStat">1/10</span></div>
       </div>
 
       <div class="game-action-bar">
@@ -1192,15 +1212,34 @@ print(n)`,
       }
     ];
 
-    const questionBank = Array.isArray(window.questionBank) && window.questionBank.length > 0
-      ? window.questionBank
-      : demoQuestionBank;
+    function resolveQuestionBank() {
+      if (Array.isArray(window.questionBank) && window.questionBank.length > 0) {
+        return window.questionBank;
+      }
+
+      // Əvvəlki questions.js faylı "const questions = [...]" formasında hazırlanıbsa,
+      // bu hissə həmin bazanı da oxumağa imkan verir.
+      if (typeof questions !== "undefined" && Array.isArray(questions) && questions.length > 0) {
+        return questions;
+      }
+
+      // Əgər hansısa versiyada "const questionBank = [...]" istifadə edilibsə,
+      // əsas oyun kodu onunla da işləsin.
+      if (typeof questionBank !== "undefined" && Array.isArray(questionBank) && questionBank.length > 0) {
+        return questionBank;
+      }
+
+      return demoQuestionBank;
+    }
+
+    const activeQuestionBank = resolveQuestionBank();
 
     const startScreen = document.getElementById("startScreen");
     const gameScreen = document.getElementById("gameScreen");
     const resultScreen = document.getElementById("resultScreen");
 
     const playerNameInput = document.getElementById("playerName");
+    const difficultySelect = document.getElementById("difficultySelect");
     const startBtn = document.getElementById("startBtn");
     const restartBtn = document.getElementById("restartBtn");
     const playAgainBtn = document.getElementById("playAgainBtn");
@@ -1249,10 +1288,16 @@ print(n)`,
     let nextLifeScore = 1000;
     let audioCtx = null;
     let musicEnabled = true;
-    let usedQuestionIds = [];
-    let questionPools = { easy: [], medium: [], hard: [] };
-    const RECENT_STORAGE_KEY = "agilliQurbagaRecentQuestions";
-    const RECENT_LIMIT_PER_DIFFICULTY = 25;
+    let selectedDifficulty = "easy";
+    let selectedQuestionPool = [];
+    let totalQuestionsInMode = 0;
+    let maxLevelForMode = 10;
+
+    const LEVELS_BY_DIFFICULTY = {
+      easy: 10,
+      medium: 20,
+      hard: 10
+    };
 
     function showScreen(screen) {
       [startScreen, gameScreen, resultScreen].forEach(item => item.classList.remove("active"));
@@ -1357,14 +1402,19 @@ print(n)`,
       }
     }
 
-    function getCurrentLevel() {
-      return Math.min(Math.floor(correctCount / CORRECT_PER_LEVEL) + 1, MAX_LEVEL);
+    function normalizeDifficulty(difficulty) {
+      const value = String(difficulty || "").trim().toLowerCase();
+
+      if (["easy", "asan"].includes(value)) return "easy";
+      if (["medium", "orta"].includes(value)) return "medium";
+      if (["hard", "çətin", "cetin", "çetin"].includes(value)) return "hard";
+
+      return value;
     }
 
-    function getDifficultyByLevel(level) {
-      if (level <= 10) return "easy";
-      if (level <= 30) return "medium";
-      return "hard";
+    function getCurrentLevel() {
+      const shown = Math.max(totalShownQuestions, 1);
+      return Math.min(Math.floor((shown - 1) / CORRECT_PER_LEVEL) + 1, maxLevelForMode);
     }
 
     function difficultyName(difficulty) {
@@ -1374,7 +1424,7 @@ print(n)`,
         hard: "Çətin"
       };
 
-      return names[difficulty] || difficulty;
+      return names[normalizeDifficulty(difficulty)] || difficulty;
     }
 
     function getRandomInt(max) {
@@ -1400,79 +1450,29 @@ print(n)`,
       return arr;
     }
 
-    function getRecentQuestions() {
-      try {
-        const data = JSON.parse(localStorage.getItem(RECENT_STORAGE_KEY));
-        return data && typeof data === "object" ? data : { easy: [], medium: [], hard: [] };
-      } catch (error) {
-        return { easy: [], medium: [], hard: [] };
-      }
-    }
+    function buildSelectedQuestionPool() {
+      const source = activeQuestionBank.filter(q => normalizeDifficulty(q.difficulty) === selectedDifficulty);
 
-    function saveRecentQuestion(difficulty, id) {
-      const recent = getRecentQuestions();
-
-      if (!Array.isArray(recent[difficulty])) {
-        recent[difficulty] = [];
-      }
-
-      recent[difficulty] = [id, ...recent[difficulty].filter(item => item !== id)]
-        .slice(0, RECENT_LIMIT_PER_DIFFICULTY);
-
-      localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(recent));
-    }
-
-    function buildQuestionPools() {
-      const recent = getRecentQuestions();
-
-      ["easy", "medium", "hard"].forEach(difficulty => {
-        const allByDifficulty = questionBank.filter(q => q.difficulty === difficulty);
-        const recentIds = Array.isArray(recent[difficulty]) ? recent[difficulty] : [];
-        const lessRecentQuestions = allByDifficulty.filter(q => !recentIds.includes(q.id));
-
-        // Əvvəlcə son oyunlarda düşməyən sualları qarışdırırıq.
-        // Əgər bu qrup çox azdırsa, bütün sualları yenidən qarışdırırıq.
-        const source = lessRecentQuestions.length >= Math.min(20, allByDifficulty.length)
-          ? lessRecentQuestions
-          : allByDifficulty;
-
-        questionPools[difficulty] = shuffleArray(source);
-      });
-    }
-
-    function refillQuestionPool(difficulty) {
-      const allByDifficulty = questionBank.filter(q => {
-        return q.difficulty === difficulty && !usedQuestionIds.includes(q.id);
-      });
-
-      questionPools[difficulty] = shuffleArray(allByDifficulty);
+      selectedQuestionPool = shuffleArray(source);
+      totalQuestionsInMode = selectedQuestionPool.length;
+      maxLevelForMode = LEVELS_BY_DIFFICULTY[selectedDifficulty] || Math.max(1, Math.ceil(totalQuestionsInMode / CORRECT_PER_LEVEL));
     }
 
     function getRandomQuestion() {
-      const level = getCurrentLevel();
-      const difficulty = getDifficultyByLevel(level);
-
-      if (!Array.isArray(questionPools[difficulty]) || questionPools[difficulty].length === 0) {
-        refillQuestionPool(difficulty);
+      if (!Array.isArray(selectedQuestionPool) || selectedQuestionPool.length === 0) {
+        return null;
       }
 
-      while (questionPools[difficulty] && questionPools[difficulty].length > 0) {
-        const selectedQuestion = questionPools[difficulty].pop();
-
-        if (!usedQuestionIds.includes(selectedQuestion.id)) {
-          usedQuestionIds.push(selectedQuestion.id);
-          saveRecentQuestion(difficulty, selectedQuestion.id);
-          return selectedQuestion;
-        }
-      }
-
-      return null;
+      // Pool oyun başlayanda tam qarışdırılır. Burada pop() təsadüfi qarışdırılmış
+      // siyahıdan növbəti sualı götürür. Eyni oyun daxilində sual təkrarlanmır.
+      return selectedQuestionPool.pop();
     }
 
     function startGame() {
       playerName = playerNameInput.value.trim() || "Oyunçu";
+      selectedDifficulty = normalizeDifficulty(difficultySelect.value || "easy");
 
-      if (!Array.isArray(questionBank) || questionBank.length === 0) {
+      if (!Array.isArray(activeQuestionBank) || activeQuestionBank.length === 0) {
         alert("Sual bazası tapılmadı. questions.js faylını yoxlayın.");
         return;
       }
@@ -1483,10 +1483,15 @@ print(n)`,
       wrongCount = 0;
       totalShownQuestions = 0;
       reviewList = [];
-      usedQuestionIds = [];
-      buildQuestionPools();
       nextLifeScore = 1000;
       nameStat.textContent = playerName;
+
+      buildSelectedQuestionPool();
+
+      if (totalQuestionsInMode === 0) {
+        alert(`${difficultyName(selectedDifficulty)} çətinliyi üzrə sual tapılmadı. questions.js faylında difficulty sahələrini yoxlayın.`);
+        return;
+      }
 
       showScreen(gameScreen);
       startBackgroundMusic();
@@ -1503,7 +1508,7 @@ print(n)`,
       boards.innerHTML = "";
       resetFrogMood();
 
-      if (lives <= 0 || getCurrentLevel() > MAX_LEVEL) {
+      if (lives <= 0) {
         endGame();
         return;
       }
@@ -1521,9 +1526,9 @@ print(n)`,
       questionStartedAt = Date.now();
 
       questionText.textContent = currentQuestion.question;
-      difficultyPill.textContent = "Çətinlik: " + difficultyName(currentQuestion.difficulty);
-      questionStat.textContent = String(totalShownQuestions);
-      levelStat.textContent = String(getCurrentLevel());
+      difficultyPill.textContent = "Çətinlik: " + difficultyName(selectedDifficulty);
+      questionStat.textContent = `${totalShownQuestions}/${totalQuestionsInMode}`;
+      levelStat.textContent = `${getCurrentLevel()}/${maxLevelForMode}`;
 
       if (currentQuestion.code && currentQuestion.code.trim()) {
         codeBlock.hidden = false;
@@ -1606,7 +1611,7 @@ print(n)`,
       finishTimeBtn.disabled = true;
       nextBtn.disabled = false;
       updateStats();
-      nextBtn.textContent = lives <= 0 ? "Nəticəni göstər" : "Növbəti sual";
+      nextBtn.textContent = lives <= 0 || selectedQuestionPool.length === 0 ? "Nəticəni göstər" : "Növbəti sual";
     }
 
     function revealAnswerDueToTime() {
@@ -1633,7 +1638,7 @@ print(n)`,
       addReview(currentQuestion, "Cavab verilmədi", "Cavab göstərildi və ya vaxt bitdi");
       finishTimeBtn.disabled = true;
       nextBtn.disabled = false;
-      nextBtn.textContent = lives <= 0 ? "Nəticəni göstər" : "Növbəti sual";
+      nextBtn.textContent = lives <= 0 || selectedQuestionPool.length === 0 ? "Nəticəni göstər" : "Növbəti sual";
       updateStats();
     }
 
@@ -1684,7 +1689,7 @@ print(n)`,
     function updateStats() {
       scoreStat.textContent = score;
       livesStat.textContent = "❤️".repeat(Math.max(lives, 0)) || "0";
-      levelStat.textContent = String(getCurrentLevel());
+      levelStat.textContent = `${getCurrentLevel()}/${maxLevelForMode}`;
     }
 
     function goNext() {
@@ -1708,7 +1713,11 @@ print(n)`,
       else if (percent >= 75) rank = "Alqoritm ustası";
       else if (percent >= 55) rank = "Çalışqan kodçu";
 
-      resultMessage.textContent = `${playerName}, nəticən: ${percent}% düzgün cavab. Çatdığın səviyyə: ${getCurrentLevel()}. Rütbə: ${rank}.`;
+      const completedText = totalShownQuestions >= totalQuestionsInMode && lives > 0
+        ? "Bütün suallar tamamlandı."
+        : "Oyun başa çatdı.";
+
+      resultMessage.textContent = `${playerName}, ${difficultyName(selectedDifficulty)} rejimi üzrə nəticən: ${percent}% düzgün cavab. ${completedText} Səviyyə: ${getCurrentLevel()}/${maxLevelForMode}. Rütbə: ${rank}.`;
       renderReview();
     }
 
