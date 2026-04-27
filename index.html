@@ -825,6 +825,87 @@
         min-height: 760px;
       }
     }
+
+
+    /* Mobil oyun görünüşü: daha yığcam HUD, kiçik qurbağa və daha yaxın cavablar */
+    @media (max-width: 600px) {
+      #gameScreen { position: relative; }
+
+      .topbar {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 6px;
+        padding: 6px 8px 2px;
+        margin-bottom: 4px;
+        font-size: 12px;
+      }
+
+      .topbar .stat {
+        padding: 6px 7px;
+        border-radius: 10px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .topbar .stat:nth-child(1) { grid-column: span 2; order: 1; }
+      .topbar .stat:nth-child(2) { grid-column: span 2; order: 2; }
+      .topbar .stat:nth-child(4) { grid-column: span 1; order: 3; }
+      .topbar .stat:nth-child(5) { grid-column: span 1; order: 4; }
+      .topbar .stat:nth-child(3) { grid-column: span 2; order: 5; color: #fff; }
+
+      .game-action-bar { padding: 0 8px; margin: 2px 0 6px; }
+      .restart-top-btn { font-size: 11px; padding: 7px 9px; border-radius: 10px; }
+
+      .question-panel { padding: 12px 10px 10px; border-radius: 14px 14px 0 0; }
+      .question-meta { gap: 5px; margin-bottom: 8px; font-size: 11px; }
+      .pill { padding: 4px 6px; }
+      .question-text { font-size: 22px; line-height: 1.25; }
+
+      pre {
+        margin-top: 10px;
+        padding: 10px;
+        font-size: 13.5px;
+        line-height: 1.45;
+        border-radius: 12px;
+      }
+
+      .timer-area { margin-top: 10px; gap: 7px; }
+      .timer-track { height: 12px; }
+      .timer-text { padding: 6px 8px; font-size: 16px; }
+
+      .water-stage {
+        min-height: 560px;
+        padding: 108px 10px 14px;
+        border-radius: 0 0 14px 14px;
+      }
+
+      .water-stage::before { top: 24px; height: 44px; }
+      .water-stage::after { top: 82px; height: 44px; }
+      .game-frog { width: 104px; top: 2px; }
+
+      .boards { gap: 10px; }
+      .board { min-height: 72px; padding: 11px 12px; grid-template-columns: 38px 1fr; }
+      .letter { width: 36px; height: 36px; font-size: 17px; }
+      .answer-text { font-size: 16px; }
+
+      .controls { gap: 8px; margin-top: 14px; }
+      .controls button:not(.icon-btn) { flex: 1 1 132px; padding: 12px 10px; font-size: 14px; }
+      .icon-btn { width: 44px; height: 44px; font-size: 20px; }
+    }
+
+    @media (max-width: 380px) {
+      .topbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .topbar .stat:nth-child(1),
+      .topbar .stat:nth-child(2),
+      .topbar .stat:nth-child(3),
+      .topbar .stat:nth-child(4),
+      .topbar .stat:nth-child(5) { grid-column: span 1; }
+      .question-text { font-size: 20px; }
+      .water-stage { min-height: 545px; padding-top: 100px; }
+      .game-frog { width: 96px; }
+      .board { min-height: 68px; }
+    }
+
   </style>
 </head>
 
@@ -1169,6 +1250,9 @@ print(n)`,
     let audioCtx = null;
     let musicEnabled = true;
     let usedQuestionIds = [];
+    let questionPools = { easy: [], medium: [], hard: [] };
+    const RECENT_STORAGE_KEY = "agilliQurbagaRecentQuestions";
+    const RECENT_LIMIT_PER_DIFFICULTY = 25;
 
     function showScreen(screen) {
       [startScreen, gameScreen, resultScreen].forEach(item => item.classList.remove("active"));
@@ -1293,28 +1377,96 @@ print(n)`,
       return names[difficulty] || difficulty;
     }
 
+    function getRandomInt(max) {
+      if (max <= 0) return 0;
+
+      if (window.crypto && window.crypto.getRandomValues) {
+        const array = new Uint32Array(1);
+        window.crypto.getRandomValues(array);
+        return array[0] % max;
+      }
+
+      return Math.floor(Math.random() * max);
+    }
+
+    function shuffleArray(items) {
+      const arr = [...items];
+
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = getRandomInt(i + 1);
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+
+      return arr;
+    }
+
+    function getRecentQuestions() {
+      try {
+        const data = JSON.parse(localStorage.getItem(RECENT_STORAGE_KEY));
+        return data && typeof data === "object" ? data : { easy: [], medium: [], hard: [] };
+      } catch (error) {
+        return { easy: [], medium: [], hard: [] };
+      }
+    }
+
+    function saveRecentQuestion(difficulty, id) {
+      const recent = getRecentQuestions();
+
+      if (!Array.isArray(recent[difficulty])) {
+        recent[difficulty] = [];
+      }
+
+      recent[difficulty] = [id, ...recent[difficulty].filter(item => item !== id)]
+        .slice(0, RECENT_LIMIT_PER_DIFFICULTY);
+
+      localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(recent));
+    }
+
+    function buildQuestionPools() {
+      const recent = getRecentQuestions();
+
+      ["easy", "medium", "hard"].forEach(difficulty => {
+        const allByDifficulty = questionBank.filter(q => q.difficulty === difficulty);
+        const recentIds = Array.isArray(recent[difficulty]) ? recent[difficulty] : [];
+        const lessRecentQuestions = allByDifficulty.filter(q => !recentIds.includes(q.id));
+
+        // Əvvəlcə son oyunlarda düşməyən sualları qarışdırırıq.
+        // Əgər bu qrup çox azdırsa, bütün sualları yenidən qarışdırırıq.
+        const source = lessRecentQuestions.length >= Math.min(20, allByDifficulty.length)
+          ? lessRecentQuestions
+          : allByDifficulty;
+
+        questionPools[difficulty] = shuffleArray(source);
+      });
+    }
+
+    function refillQuestionPool(difficulty) {
+      const allByDifficulty = questionBank.filter(q => {
+        return q.difficulty === difficulty && !usedQuestionIds.includes(q.id);
+      });
+
+      questionPools[difficulty] = shuffleArray(allByDifficulty);
+    }
+
     function getRandomQuestion() {
       const level = getCurrentLevel();
       const difficulty = getDifficultyByLevel(level);
 
-      let availableQuestions = questionBank.filter(q => {
-        return q.difficulty === difficulty && !usedQuestionIds.includes(q.id);
-      });
-
-      // Əgər həmin çətinlikdə suallar bitibsə, eyni çətinlik üçün təkrar sual seçməyə icazə veririk.
-      // Böyük sual bazasında bu hal, adətən, baş verməyəcək.
-      if (availableQuestions.length === 0) {
-        availableQuestions = questionBank.filter(q => q.difficulty === difficulty);
+      if (!Array.isArray(questionPools[difficulty]) || questionPools[difficulty].length === 0) {
+        refillQuestionPool(difficulty);
       }
 
-      if (availableQuestions.length === 0) {
-        return null;
+      while (questionPools[difficulty] && questionPools[difficulty].length > 0) {
+        const selectedQuestion = questionPools[difficulty].pop();
+
+        if (!usedQuestionIds.includes(selectedQuestion.id)) {
+          usedQuestionIds.push(selectedQuestion.id);
+          saveRecentQuestion(difficulty, selectedQuestion.id);
+          return selectedQuestion;
+        }
       }
 
-      const randomIndex = Math.floor(Math.random() * availableQuestions.length);
-      const selectedQuestion = availableQuestions[randomIndex];
-      usedQuestionIds.push(selectedQuestion.id);
-      return selectedQuestion;
+      return null;
     }
 
     function startGame() {
@@ -1332,6 +1484,7 @@ print(n)`,
       totalShownQuestions = 0;
       reviewList = [];
       usedQuestionIds = [];
+      buildQuestionPools();
       nextLifeScore = 1000;
       nameStat.textContent = playerName;
 
