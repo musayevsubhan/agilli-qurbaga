@@ -169,6 +169,42 @@
       line-height: 1.5;
     }
 
+    .saved-game-panel {
+      margin-top: 18px;
+      padding: 16px;
+      border-radius: 18px;
+      background: #eef8ff;
+      border: 1px solid #c9e8f8;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    .saved-game-panel[hidden] {
+      display: none;
+    }
+
+    .saved-game-title {
+      display: block;
+      margin-bottom: 6px;
+      color: #08324f;
+      font-size: 17px;
+    }
+
+    .saved-game-info {
+      margin: 0 0 12px;
+      color: #304e63;
+      line-height: 1.45;
+    }
+
+    .saved-game-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .saved-game-actions button {
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+    }
+
     /* Başlanğıc ekranındakı qurbağa sahəsi */
     .frog-wrap {
       min-height: 310px;
@@ -906,6 +942,8 @@
       .controls { gap: 8px; margin-top: 14px; }
       .controls button:not(.icon-btn) { flex: 1 1 132px; padding: 12px 10px; font-size: 14px; }
       .icon-btn { width: 44px; height: 44px; font-size: 20px; }
+      .saved-game-panel { padding: 13px; border-radius: 14px; }
+      .saved-game-actions button { flex: 1 1 150px; padding: 12px 10px; }
     }
 
     @media (max-width: 380px) {
@@ -948,6 +986,15 @@
           <p class="small-note">
             Çətinliyi seç, oyuna başla. Cavabı mausla seçə və ya klaviaturadan A, B, C, D düymələrindən istifadə edə bilərsən.
           </p>
+
+          <div id="savedGamePanel" class="saved-game-panel" hidden>
+            <strong class="saved-game-title">Yarımçıq oyun tapıldı</strong>
+            <p id="savedGameInfo" class="saved-game-info"></p>
+            <div class="saved-game-actions">
+              <button id="continueGameBtn" class="btn-primary">Qaldığım yerdən davam et</button>
+              <button id="newGameBtn" class="btn-secondary">Yenidən başla</button>
+            </div>
+          </div>
         </div>
 
         <div class="frog-wrap" aria-label="Eynəkli qurbağa personajı">
@@ -1241,6 +1288,10 @@ print(n)`,
     const playerNameInput = document.getElementById("playerName");
     const difficultySelect = document.getElementById("difficultySelect");
     const startBtn = document.getElementById("startBtn");
+    const continueGameBtn = document.getElementById("continueGameBtn");
+    const newGameBtn = document.getElementById("newGameBtn");
+    const savedGamePanel = document.getElementById("savedGamePanel");
+    const savedGameInfo = document.getElementById("savedGameInfo");
     const restartBtn = document.getElementById("restartBtn");
     const playAgainBtn = document.getElementById("playAgainBtn");
 
@@ -1299,9 +1350,132 @@ print(n)`,
       hard: 10
     };
 
+    const SAVE_KEY = "agilliQurbaga.savedGame.v2";
+
     function showScreen(screen) {
       [startScreen, gameScreen, resultScreen].forEach(item => item.classList.remove("active"));
       screen.classList.add("active");
+    }
+
+    function getQuestionById(id) {
+      return activeQuestionBank.find(q => String(q.id) === String(id)) || null;
+    }
+
+    function getSavedGameState() {
+      try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (!raw) return null;
+
+        const state = JSON.parse(raw);
+        if (!state || state.version !== 2) return null;
+        if (!Array.isArray(state.selectedQuestionPoolIds)) return null;
+
+        return state;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function saveGameState() {
+      if (!gameScreen.classList.contains("active")) return;
+      if (lives <= 0) return;
+      if (!selectedDifficulty || totalQuestionsInMode <= 0) return;
+
+      const state = {
+        version: 2,
+        savedAt: Date.now(),
+        playerName,
+        selectedDifficulty,
+        score,
+        lives,
+        correctCount,
+        wrongCount,
+        totalShownQuestions,
+        timeLeft: Math.max(timeLeft, 0),
+        totalTime,
+        nextLifeScore,
+        reviewList,
+        totalQuestionsInMode,
+        maxLevelForMode,
+        selectedQuestionPoolIds: selectedQuestionPool.map(q => q.id),
+        currentQuestionId: answered ? null : (currentQuestion ? currentQuestion.id : null)
+      };
+
+      try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+      } catch (error) {
+        console.warn("Oyun vəziyyəti yadda saxlanmadı:", error);
+      }
+    }
+
+    function clearSavedGame() {
+      try {
+        localStorage.removeItem(SAVE_KEY);
+      } catch (error) {
+        console.warn("Yadda saxlanmış oyun silinmədi:", error);
+      }
+      updateSavedGamePanel();
+    }
+
+    function updateSavedGamePanel() {
+      const state = getSavedGameState();
+
+      if (!state) {
+        savedGamePanel.hidden = true;
+        return;
+      }
+
+      const currentNumber = Math.max(1, state.totalShownQuestions || 1);
+      const totalNumber = state.totalQuestionsInMode || state.selectedQuestionPoolIds.length || "?";
+      const level = Math.min(Math.floor((currentNumber - 1) / CORRECT_PER_LEVEL) + 1, state.maxLevelForMode || 1);
+      const maxLevel = state.maxLevelForMode || 1;
+
+      playerNameInput.value = state.playerName || "";
+      difficultySelect.value = state.selectedDifficulty || "easy";
+      savedGameInfo.textContent = `${state.playerName || "Oyunçu"} üçün ${difficultyName(state.selectedDifficulty)} oyun yarımçıq qalıb. Sual: ${currentNumber}/${totalNumber}, səviyyə: ${level}/${maxLevel}, xal: ${state.score || 0}, can: ${state.lives || 0}.`;
+      savedGamePanel.hidden = false;
+    }
+
+    function continueSavedGame() {
+      const state = getSavedGameState();
+
+      if (!state) {
+        alert("Yarımçıq oyun tapılmadı.");
+        updateSavedGamePanel();
+        return;
+      }
+
+      playerName = state.playerName || "Oyunçu";
+      selectedDifficulty = normalizeDifficulty(state.selectedDifficulty || "easy");
+      score = Number(state.score) || 0;
+      lives = Number(state.lives) || 3;
+      correctCount = Number(state.correctCount) || 0;
+      wrongCount = Number(state.wrongCount) || 0;
+      totalShownQuestions = Number(state.totalShownQuestions) || 0;
+      nextLifeScore = Number(state.nextLifeScore) || 1000;
+      reviewList = Array.isArray(state.reviewList) ? state.reviewList : [];
+      totalQuestionsInMode = Number(state.totalQuestionsInMode) || 0;
+      maxLevelForMode = Number(state.maxLevelForMode) || (LEVELS_BY_DIFFICULTY[selectedDifficulty] || 10);
+      selectedQuestionPool = (state.selectedQuestionPoolIds || []).map(getQuestionById).filter(Boolean);
+
+      nameStat.textContent = playerName;
+      showScreen(gameScreen);
+      startBackgroundMusic();
+
+      const restoredQuestion = state.currentQuestionId ? getQuestionById(state.currentQuestionId) : null;
+      if (restoredQuestion) {
+        currentQuestion = restoredQuestion;
+        totalTime = Number(state.totalTime) || getDefaultTimeByDifficulty(currentQuestion.difficulty);
+        timeLeft = Math.max(Number(state.timeLeft) || totalTime, 1);
+        renderQuestion(false);
+      } else {
+        loadQuestion();
+      }
+    }
+
+    function startNewGameFromSavedPanel() {
+      clearSavedGame();
+      startGame();
     }
 
     function getAudioContext() {
@@ -1477,6 +1651,10 @@ print(n)`,
         return;
       }
 
+      try {
+        localStorage.removeItem(SAVE_KEY);
+      } catch (error) {}
+
       score = 0;
       lives = 3;
       correctCount = 0;
@@ -1523,7 +1701,26 @@ print(n)`,
       totalShownQuestions++;
       totalTime = currentQuestion.time || getDefaultTimeByDifficulty(currentQuestion.difficulty);
       timeLeft = totalTime;
-      questionStartedAt = Date.now();
+      renderQuestion(true);
+    }
+
+    function renderQuestion(resetStartedAt = true) {
+      if (!currentQuestion) return;
+
+      clearInterval(timer);
+      answered = false;
+      feedback.className = "feedback";
+      feedback.innerHTML = "";
+      nextBtn.disabled = true;
+      finishTimeBtn.disabled = false;
+      boards.innerHTML = "";
+      resetFrogMood();
+
+      if (resetStartedAt) {
+        questionStartedAt = Date.now();
+      } else {
+        questionStartedAt = Date.now() - Math.max(totalTime - timeLeft, 0) * 1000;
+      }
 
       questionText.textContent = currentQuestion.question;
       difficultyPill.textContent = "Çətinlik: " + difficultyName(selectedDifficulty);
@@ -1549,6 +1746,7 @@ print(n)`,
 
       updateStats();
       updateTimerUi();
+      saveGameState();
       timer = setInterval(tick, 1000);
     }
 
@@ -1561,6 +1759,7 @@ print(n)`,
     function tick() {
       timeLeft--;
       updateTimerUi();
+      saveGameState();
 
       if (timeLeft <= 0) {
         revealAnswerDueToTime();
@@ -1612,6 +1811,7 @@ print(n)`,
       nextBtn.disabled = false;
       updateStats();
       nextBtn.textContent = lives <= 0 || selectedQuestionPool.length === 0 ? "Nəticəni göstər" : "Növbəti sual";
+      saveGameState();
     }
 
     function revealAnswerDueToTime() {
@@ -1640,6 +1840,7 @@ print(n)`,
       nextBtn.disabled = false;
       nextBtn.textContent = lives <= 0 || selectedQuestionPool.length === 0 ? "Nəticəni göstər" : "Növbəti sual";
       updateStats();
+      saveGameState();
     }
 
     function finishTimeEarly() {
@@ -1698,6 +1899,9 @@ print(n)`,
 
     function endGame() {
       clearInterval(timer);
+      try {
+        localStorage.removeItem(SAVE_KEY);
+      } catch (error) {}
       showScreen(resultScreen);
 
       finalScore.textContent = score;
@@ -1768,6 +1972,7 @@ print(n)`,
     function restartToStart() {
       clearInterval(timer);
       stopBackgroundMusic();
+      clearSavedGame();
 
       musicEnabled = true;
       if (musicToggleBtn) {
@@ -1778,6 +1983,8 @@ print(n)`,
     }
 
     startBtn.addEventListener("click", startGame);
+    continueGameBtn.addEventListener("click", continueSavedGame);
+    newGameBtn.addEventListener("click", startNewGameFromSavedPanel);
     restartBtn.addEventListener("click", restartToStart);
     playAgainBtn.addEventListener("click", restartToStart);
     nextBtn.addEventListener("click", goNext);
@@ -1794,6 +2001,12 @@ print(n)`,
         chooseAnswer(key);
       }
     });
+
+    window.addEventListener("beforeunload", () => {
+      saveGameState();
+    });
+
+    updateSavedGamePanel();
   </script>
 </body>
 </html>
